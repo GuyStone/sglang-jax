@@ -602,6 +602,18 @@ class ModelRunner(BaseModelRunner):
                 layer_num=self.model_config.num_hidden_layers,
                 mesh=self.mesh,
             )
+        elif self.server_args.attention_backend == "flashinfer":
+            from sgl_jax.srt.mem_cache.flashinfer_kv_pool import FlashInferKVPool
+
+            self.token_to_kv_pool = FlashInferKVPool(
+                size=self.max_total_num_tokens,
+                page_size=self.page_size,
+                dtype=self.kv_cache_dtype,
+                head_num=self.model_config.get_total_num_kv_heads_with_replication(self.tp_size),
+                head_dim=self.model_config.head_dim,
+                layer_num=self.model_config.num_hidden_layers,
+                mesh=self.mesh,
+            )
         else:
             # Non-MLA model, OR an MLA model running fa_mha / native (both
             # decompress latent KV per-forward and store full per-head K/V).
@@ -651,9 +663,10 @@ class ModelRunner(BaseModelRunner):
 
     def _get_attention_backend(self):
         backend = self.server_args.attention_backend
-        if self.server_args.device == "cpu" and backend in ("fa", "fa_mha"):
+        if self.server_args.device == "cpu" and backend in ("fa", "fa_mha", "flashinfer"):
             logger.warning(
-                "FlashAttention backend is not supported on CPU; falling back to native."
+                "%s backend is not supported on CPU; falling back to native.",
+                backend,
             )
             backend = "native"
 
@@ -675,6 +688,18 @@ class ModelRunner(BaseModelRunner):
                 v_head_dim=cfg.v_head_dim,
                 page_size=self.page_size,
                 mesh=self.mesh,
+            )
+
+        if backend == "flashinfer":
+            from sgl_jax.srt.layers.attention.flashinfer_backend import FlashInferAttention
+
+            return FlashInferAttention(
+                num_attn_heads=self.num_attn_heads,
+                num_kv_heads=self.num_kv_heads,
+                head_dim=self.model_config.head_dim,
+                page_size=self.page_size,
+                mesh=self.mesh,
+                dtype=self.model_config.dtype,
             )
 
         if backend not in ("fa", "fa_mha"):

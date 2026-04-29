@@ -911,6 +911,7 @@ class ServerArgs:
                 "native",
                 "fa",
                 "fa_mha",
+                "flashinfer",
             ],
             default=ServerArgs.attention_backend,
             help=(
@@ -918,7 +919,9 @@ class ServerArgs:
                 "'fa' = FlashAttention for MHA models, MLA Pallas kernel (absorbed) for MLA models. "
                 "'fa_mha' = force the MHA FlashAttention path for MLA models too "
                 "(decompress latent KV per-forward via kv_b_proj; ~70x more KV cache than 'fa', "
-                "intended for kernel A/B on short contexts)."
+                "intended for kernel A/B on short contexts). "
+                "'flashinfer' = FlashInfer GPU kernels via jax-tvm-ffi bridge "
+                "(requires flashinfer and jax-tvm-ffi packages, GPU only)."
             ),
         )
         parser.add_argument(
